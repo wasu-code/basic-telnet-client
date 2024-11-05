@@ -1,6 +1,7 @@
 import socket
 import sys
 import threading
+import telc
 
 # Importing msvcrt for Windows or use sys.stdin for Unix-based systems
 try:
@@ -10,35 +11,29 @@ except ImportError:
     import tty
     import termios
 
-# Stałe TELNET
-IAC = 255  # Interpret As Command
-DONT = 254
-DO = 253
-WONT = 252
-WILL = 251
-SE = 240  # End of subnegotiation parameters
-NOP = 241  # No operation
-SB = 250  # Subnegotiation
-GA = 249  # Go ahead
-EL = 248  # Erase line
-EC = 247  # Erase character
-AYT = 246  # Are you there
-AO = 245  # Abort output
-IP = 244  # Interrupt process
-BRK = 243  # Break
-DM = 242  # Data mark
-
 
 def filter_telnet_commands(data):
     """Funkcja usuwająca kody sterujące"""
     result = bytearray()
     i = 0
     while i < len(data):
-        if data[i] == IAC:
+        if data[i] == telc.IAC:
             i += 1  # Pomiń IAC
-            if data[i] in (DO, DONT, WILL, WONT):
+            if data[i] in (telc.DO, telc.DONT, telc.WILL, telc.WONT):
                 i += 2  # Pomiń opcję
-            elif data[i] in (SB, SE, NOP, GA, EL, EC, AYT, AO, IP, BRK, DM):
+            elif data[i] in (
+                telc.SB,
+                telc.SE,
+                telc.NOP,
+                telc.GA,
+                telc.EL,
+                telc.EC,
+                telc.AYT,
+                telc.AO,
+                telc.IP,
+                telc.BRK,
+                telc.DM,
+            ):
                 i += 1  # Pomiń polecenie
         else:
             result.append(data[i])
@@ -46,25 +41,26 @@ def filter_telnet_commands(data):
     return result.decode("utf-8", errors="ignore")
 
 
-# Funkcja obsługująca opcje TELNET
 def handle_telnet_option(command, option, sock):
-    if command == DO or command == DONT:
+    """Funkcja obsługująca negocjacje opcji TELNET"""
+    if command == telc.DO or command == telc.DONT:
         # Serwer prosi klienta o włączenie lub wyłączenie opcji
         # Odpowiadamy "WONT" dla wszystkich opcji, których nie obsługujemy
-        sock.sendall(bytes([IAC, WONT, option]))
-    elif command == WILL or command == WONT:
+        sock.sendall(bytes([telc.IAC, telc.WONT, option]))
+    elif command == telc.WILL or command == telc.WONT:
         # Serwer informuje, że będzie lub nie będzie obsługiwał opcji
         # Odpowiadamy "DONT" dla wszystkich opcji, których nie obsługujemy
-        sock.sendall(bytes([IAC, DONT, option]))
+        sock.sendall(bytes([telc.IAC, telc.DONT, option]))
 
 
 def receive_data(sock):
+    """Function to receive and print data from the server"""
     buffer = bytearray()
     while True:
         try:
             data = sock.recv(1024)
             if not data:
-                print("\nPołączenie zamknięte przez serwer.")
+                print("\nConnection closed by the server.")
                 break
 
             buffer.extend(data)
@@ -72,11 +68,16 @@ def receive_data(sock):
             # Process data to handle Telnet commands
             i = 0
             while i < len(buffer):
-                if buffer[i] == IAC:
+                if buffer[i] == telc.IAC:
                     # We have encountered a Telnet command
                     if i + 1 < len(buffer):
                         command = buffer[i + 1]
-                        if command in (DO, DONT, WILL, WONT) and i + 2 < len(buffer):
+                        if command in (
+                            telc.DO,
+                            telc.DONT,
+                            telc.WILL,
+                            telc.WONT,
+                        ) and i + 2 < len(buffer):
                             option = buffer[i + 2]
                             handle_telnet_option(command, option, sock)
                             i += 2  # Skip the option byte
@@ -92,7 +93,7 @@ def receive_data(sock):
             buffer = buffer[i:]
 
         except socket.error as e:
-            print(f"\nBłąd połączenia: {e}")
+            print(f"\nConnection error: {e}")
             break
 
 
@@ -118,12 +119,12 @@ def send_data(sock):
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     except socket.error as e:
-        print(f"\nBłąd wysyłania danych: {e}")
+        print(f"\nError sending data: {e}")
 
 
 def main():
     if len(sys.argv) != 3:
-        print("Użycie: python c2.py <host> <port>")
+        print("Usage: python <filename>.py <host> <port>")
         sys.exit(1)
 
     host = sys.argv[1]
@@ -133,7 +134,7 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((host, port))
 
-    print(f"Połączono z {host}:{port}")
+    print(f"Connected to {host}:{port}")
 
     # Tworzenie i uruchamianie wątków do odbierania i wysyłania danych
     receive_thread = threading.Thread(target=receive_data, args=(sock,))
