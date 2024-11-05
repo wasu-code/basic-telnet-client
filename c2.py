@@ -1,7 +1,7 @@
 import socket
 import sys
 import threading
-import telc
+import telc  # telnet commands
 
 # Importing msvcrt for Windows or use sys.stdin for Unix-based systems
 try:
@@ -10,35 +10,6 @@ except ImportError:
     import sys
     import tty
     import termios
-
-
-def filter_telnet_commands(data):
-    """Funkcja usuwająca kody sterujące"""
-    result = bytearray()
-    i = 0
-    while i < len(data):
-        if data[i] == telc.IAC:
-            i += 1  # Pomiń IAC
-            if data[i] in (telc.DO, telc.DONT, telc.WILL, telc.WONT):
-                i += 2  # Pomiń opcję
-            elif data[i] in (
-                telc.SB,
-                telc.SE,
-                telc.NOP,
-                telc.GA,
-                telc.EL,
-                telc.EC,
-                telc.AYT,
-                telc.AO,
-                telc.IP,
-                telc.BRK,
-                telc.DM,
-            ):
-                i += 1  # Pomiń polecenie
-        else:
-            result.append(data[i])
-        i += 1
-    return result.decode("utf-8", errors="ignore")
 
 
 def handle_telnet_option(command, option, sock):
@@ -69,7 +40,7 @@ def receive_data(sock):
             i = 0
             while i < len(buffer):
                 if buffer[i] == telc.IAC:
-                    # We have encountered a Telnet command
+                    # IAC wskazuje polecenie sterujące w formacie: IAC | Kod polecenia | Kod opcji
                     if i + 1 < len(buffer):
                         command = buffer[i + 1]
                         if command in (
@@ -105,7 +76,7 @@ def send_data(sock):
             while True:
                 char = msvcrt.getch()  # Odczytaj pojedynczy znak
                 sock.sendall(char)  # Wyślij znak do serwera
-                print(char.decode(), end="", flush=True)  # Echo na konsoli
+                # print(char.decode(), end="", flush=True)  # Echo na konsoli
         else:
             # Unix-based: użycie sys.stdin do odczytu znaków
             fd = sys.stdin.fileno()
@@ -115,7 +86,7 @@ def send_data(sock):
                 while True:
                     char = sys.stdin.read(1)  # Odczytaj pojedynczy znak
                     sock.sendall(char.encode())  # Wyślij znak do serwera
-                    print(char, end="", flush=True)  # Echo na konsoli
+                    # print(char, end="", flush=True)  # Echo na konsoli
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     except socket.error as e:
