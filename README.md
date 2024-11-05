@@ -1,15 +1,20 @@
 # Telnet
 
+## Instalacja programów do testowania
+
+### Instalacja serwera
+
 instalujemy serwer telnet by przez łączenie z nim testować naszego klienta
 np. [KpyM](https://www.kpym.com/2/kpym/index.htm)
 
-> zainstalować i usunąć usługę !!! (usługę, nie instalator)
+> potem odinstalować i usunąć usługę !!! (usługę, nie instalator)
 
-port 23
+Ustawiamy:
 
-Banmaxconnections na 0
+- `port`: 23
+- `ban_max_connections`: 0
 
-### klienta
+### Instalacja klienta
 
 PuTTY
 
@@ -17,11 +22,11 @@ na PC musimy mięć lokalne konto użytkownika
 
 wireshark
 
-przechwytywanie ruchu lokalnego
+> przechwytywanie ruchu lokalnego
 
 ---
 
-stary protokół, ale jest częścią wielu nowszych
+stary protokół, ale jest częścią wielu nowszych jak HTTP
 
 ## Zadanie
 
@@ -30,21 +35,30 @@ stary protokół, ale jest częścią wielu nowszych
 - nasz klient nie musi obsługiwać dodatkowych opcji ale musi na nie odpowiedzeić (np. że nie zrobi)
 - pozbycie się ze strumienia danych części ... żeby kody sterujące nie trafiły do strumienia danych konsoli
 - echo
-  - lokalne - nas zpc wyświetla na konsoli co wpisaliśmy
+  - lokalne - nasz pc wyświetla na konsoli co wpisaliśmy
   - zdalne - na serwerze jest wpisywane i serwer odsyła co wpisze
 - tryb pracy: znak po znaku czy po lini - poinformować serwer
 
 ## RFC
 
-In summary, WILL XXX is sent, by either party, to indicate that
-   party's desire (offer) to begin performing option XXX, DO XXX and
-   DON'T XXX being its positive and negative acknowledgments; similarly,
-   DO XXX is sent to indicate a desire (request) that the other party
-   (i.e., the recipient of the DO) begin performing option XXX, WILL XXX
-   and WON'T XXX being the positive and negative acknowledgments.  Since
-   the NVT is what is left when no options are enabled, the DON'T and
-   WON'T responses are guaranteed to leave the connection in a state
-   which both ends can handle.  Thus, all hosts may implement their
-   TELNET processes to be totally unaware of options that are not
-   supported, simply returning a rejection to (i.e., refusing) any
-   option request that cannot be understood.
+[`RFC 854`](https://datatracker.ietf.org/doc/html/rfc854)
+[`RFC 855`](https://datatracker.ietf.org/doc/html/rfc855)
+
+> In summary, WILL XXX is sent, by either party, to indicate that
+> party's desire (offer) to begin performing option XXX, DO XXX and
+> DON'T XXX being its positive and negative acknowledgments; similarly,
+> DO XXX is sent to indicate a desire (request) that the other party
+> (i.e., the recipient of the DO) begin performing option XXX, WILL XXX
+> and WON'T XXX being the positive and negative acknowledgments. Since
+> the NVT is what is left when no options are enabled, the DON'T and
+> WON'T responses are guaranteed to leave the connection in a state
+> which both ends can handle. Thus, all hosts may implement their
+> TELNET processes to be totally unaware of options that are not
+> supported, simply returning a rejection to (i.e., refusing) any
+> option request that cannot be understood.
+
+## TODO
+
+- backspace to ...
+- close program when connection closes
+- usunąć znaki sterujące jeśli konsola ich nie obsługuje (bo działa w VSC ale nie w cmd)

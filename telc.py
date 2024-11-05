@@ -47,3 +47,7 @@ BRK = 243
 
 DM = 242
 """Data mark. Indicates the position of a Synch event within the data stream. This should always be accompanied by a TCP urgent notification."""
+
+OPTION_LINEMODE = 34
+
+OPTION_ECHO = 1
