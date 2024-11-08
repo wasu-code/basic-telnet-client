@@ -60,5 +60,3 @@ stary protokół, ale jest częścią wielu nowszych jak HTTP
 ## TODO
 
 - backspace to ...
-- close program when connection closes
-- usunąć znaki sterujące jeśli konsola ich nie obsługuje (bo działa w VSC ale nie w cmd)

@@ -15,14 +15,19 @@ except ImportError:
 ACCEPT_CONTROL_CHARS = (
     False  # Enable (for VSC) or disable (for cmd) printing of control characters
 )
+LOCAL_ECHO = True
+
+stop_event = threading.Event()
 
 
 def handle_telnet_option(command, option, sock):
     """Funkcja obsługująca negocjacje opcji TELNET"""
-    print(f">>>{command}, {option}")
+    # print(f">>>{command}, {option}")
     if command == telc.WILL and option == telc.OPTION_ECHO:
-        print("echo? then dont")
-        return sock.sendall(bytes([telc.IAC, telc.DONT, telc.OPTION_ECHO]))
+        global LOCAL_ECHO
+        LOCAL_ECHO = False  # server sends echo, no need to double it with local echo
+        print("Using remote echo")
+        return sock.sendall(bytes([telc.IAC, telc.DO, telc.OPTION_ECHO]))
 
     if command == telc.DO or command == telc.DONT:
         # Serwer prosi klienta o włączenie lub wyłączenie opcji
@@ -46,6 +51,7 @@ def receive_data(sock):
             data = sock.recv(1024)
             if not data:
                 print("\nConnection closed by the server.")
+                stop_event.set()
                 break
 
             buffer.extend(data)
@@ -90,6 +96,7 @@ def receive_data(sock):
 
         except socket.error as e:
             print(f"\nConnection error: {e}")
+            stop_event.set()
             break
 
 
@@ -101,7 +108,8 @@ def send_data(sock):
             while True:
                 char = msvcrt.getch()  # Odczytaj pojedynczy znak
                 sock.sendall(char)  # Wyślij znak do serwera
-                # print(char.decode(), end="", flush=True)  # Echo na konsoli
+                if LOCAL_ECHO:
+                    print(char.decode(), end="", flush=True)  # Echo na konsoli
         else:
             # Unix-based: użycie sys.stdin do odczytu znaków
             fd = sys.stdin.fileno()
@@ -109,46 +117,51 @@ def send_data(sock):
             try:
                 tty.setraw(sys.stdin.fileno())
                 while True:
-                    char = sys.stdin.read(1)  # Odczytaj pojedynczy znak
-                    sock.sendall(char.encode())  # Wyślij znak do serwera
-                    # print(char, end="", flush=True)  # Echo na konsoli
+                    char = sys.stdin.read(1)
+                    sock.sendall(char.encode())
+                    if LOCAL_ECHO:
+                        print(char, end="", flush=True)  # Echo na konsoli
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     except socket.error as e:
         print(f"\nError sending data: {e}")
+        stop_event.set()
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python <filename>.py <host> <port>")
-        sys.exit(1)
+    if len(sys.argv) == 3:
+        # Usage: python <filename>.py <host> <port>"
+        host = sys.argv[1]
+        port = int(sys.argv[2])
+    else:
+        host = str(input("Target host (defaults to localhost): ") or "localhost")
+        port = int(input("Target port (defaults to 23): ") or 23)
 
-    host = sys.argv[1]
-    port = int(sys.argv[2])
-
-    # Tworzenie gniazda TCP
+    # Create TCP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((host, port))
 
     print(f"Connected to {host}:{port}")
 
-    # Tworzenie i uruchamianie wątków do odbierania i wysyłania danych
+    sock.sendall(
+        bytes([telc.IAC, telc.WONT, telc.OPTION_LINEMODE])
+    )  # inform server we won't be sending lines but chars
+
+    # Separate threads for sending and receiving data
     receive_thread = threading.Thread(target=receive_data, args=(sock,))
     send_thread = threading.Thread(target=send_data, args=(sock,))
 
-    # Ustawienie wątków jako daemons, aby zamykały się po zakończeniu głównego programu
+    # Set threads as daemons, so they close after main program closes
     receive_thread.daemon = True
     send_thread.daemon = True
 
-    # Start wątków
     receive_thread.start()
     send_thread.start()
 
-    # Czekanie na zakończenie wątków
-    receive_thread.join()
-    send_thread.join()
+    # Close main program after thread event is set
+    stop_event.wait()
 
-    # Zamknięcie połączenia po zakończeniu
+    # Close connection
     sock.close()
 
 
