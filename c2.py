@@ -13,7 +13,7 @@ except ImportError:
     import termios
 
 ACCEPT_CONTROL_CHARS = (
-    False  # Enable (for VSC) or disable (for cmd) printing of control characters
+    True  # Enable (for VSC) or disable (for cmd) printing of control characters
 )
 LOCAL_ECHO = True
 
@@ -26,7 +26,7 @@ def handle_telnet_option(command, option, sock):
     if command == telc.WILL and option == telc.OPTION_ECHO:
         global LOCAL_ECHO
         LOCAL_ECHO = False  # server sends echo, no need to double it with local echo
-        print("Using remote echo")
+        print("Using remote echo", end="", flush=True)
         return sock.sendall(bytes([telc.IAC, telc.DO, telc.OPTION_ECHO]))
 
     if command == telc.DO or command == telc.DONT:
@@ -43,9 +43,18 @@ def receive_data(sock):
     """Function to receive and print data from the server, detecting Telnet commands and ANSI escape codes."""
     buffer = bytearray()
 
-    # Regular expression pattern for ANSI escape codes
-    ansi_escape_pattern = re.compile(rb"\x1B\[[0-?]*[ -/]*[@-~]")
+    # Regular expression patterns to identify ANSI codes for control sequences
+    ansi_escape_pattern = re.compile(
+        rb"\x1B\[[0-?]*[ -/]*[@-~]"
+    )  # General ANSI escape code
+    cursor_position_pattern = re.compile(
+        rb"\x1b\[(\d*);(\d*)f"
+    )  # Move cursor to (row; col)
+    cursor_down_pattern = re.compile(rb"\x1b\[(\d*)B")  # Move cursor down
+    clear_line_pattern = re.compile(rb"\x1b\[2K")  # Clear line
 
+    last_row = 0
+    last_col = 0
     while True:
         try:
             data = sock.recv(1024)
@@ -64,6 +73,35 @@ def receive_data(sock):
                     match = ansi_escape_pattern.match(buffer[i:])
                     if match:
                         ansi_sequence = match.group(0)
+
+                        # Handle specific ANSI sequences
+                        if cursor_position_pattern.match(ansi_sequence):
+                            # Match the cursor position ANSI code, like \x1b[9;15f
+                            row, col = cursor_position_pattern.match(
+                                ansi_sequence
+                            ).groups()
+                            row = int(row) if row.isdigit() else last_row
+                            col = int(col) if col.isdigit() else last_col
+                            # Add newlines only if overriding some existing text
+                            if col < last_col:
+                                print("\n", end="", flush=True)
+                            last_row = row
+                            last_col = col
+
+                        elif cursor_down_pattern.match(ansi_sequence):
+                            # Match the cursor down ANSI code, like \x1b[3B
+                            num_lines = int(
+                                cursor_down_pattern.match(ansi_sequence).group(1) or 1
+                            )
+
+                            # Only add newlines if moving down by more than 1 line
+                            if num_lines > 1:
+                                print("\n" * (num_lines - 1), end="", flush=True)
+
+                        elif clear_line_pattern.match(ansi_sequence):
+                            # Clear line (approximate by starting a new line)
+                            print("\n", end="", flush=True)
+
                         # Move the index past the matched ANSI escape code
                         i += len(ansi_sequence)
                         continue  # Continue to process the rest of the buffer
