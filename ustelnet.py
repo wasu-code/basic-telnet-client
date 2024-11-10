@@ -2,7 +2,13 @@ import re
 import socket
 import sys
 import threading
-import telc  # telnet commands
+
+try:
+    import telc  # telnet commands
+except ImportError:
+    print("Error: 'telc.py' file with telnet commands was not found.")
+    print("Make sure 'telc.py' is in the same directory as this script.")
+    sys.exit(1)
 
 # Importing msvcrt for Windows or use sys.stdin for Unix-based systems
 try:
