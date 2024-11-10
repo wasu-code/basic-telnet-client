@@ -13,7 +13,7 @@ except ImportError:
     import termios
 
 ACCEPT_CONTROL_CHARS = (
-    True  # Enable (for VSC) or disable (for cmd) printing of control characters
+    False  # Enable (for VSC) or disable (for cmd) printing of control characters
 )
 LOCAL_ECHO = True
 
@@ -21,7 +21,7 @@ stop_event = threading.Event()
 
 
 def handle_telnet_option(command, option, sock):
-    """Funkcja obsługująca negocjacje opcji TELNET"""
+    """Function to handle TELNET options negotiations"""
     # print(f">>>{command}, {option}")
     if command == telc.WILL and option == telc.OPTION_ECHO:
         global LOCAL_ECHO
@@ -30,17 +30,17 @@ def handle_telnet_option(command, option, sock):
         return sock.sendall(bytes([telc.IAC, telc.DO, telc.OPTION_ECHO]))
 
     if command == telc.DO or command == telc.DONT:
-        # Serwer prosi klienta o włączenie lub wyłączenie opcji
-        # Odpowiadamy "WONT" dla wszystkich opcji, których nie obsługujemy
+        # Server asks to turn option on/off
+        # Answer "WONT" for all (unsupported) options
         sock.sendall(bytes([telc.IAC, telc.WONT, option]))
     elif command == telc.WILL or command == telc.WONT:
-        # Serwer informuje, że będzie lub nie będzie obsługiwał opcji
-        # Odpowiadamy "DONT" dla wszystkich opcji, których nie obsługujemy
+        # Server informs it will/won't support a given option
+        # Answer "DONT" for all (unsupported) options
         sock.sendall(bytes([telc.IAC, telc.DONT, option]))
 
 
 def receive_data(sock):
-    """Function to receive and print data from the server, detecting Telnet commands and ANSI escape codes."""
+    """Function to receive and print data from the server. Also handles detecting Telnet commands and ANSI escape codes."""
     buffer = bytearray()
 
     # Regular expression patterns to identify ANSI codes for control sequences
@@ -76,7 +76,7 @@ def receive_data(sock):
 
                         # Handle specific ANSI sequences
                         if cursor_position_pattern.match(ansi_sequence):
-                            # Match the cursor position ANSI code, like \x1b[9;15f
+                            # Match the cursor position ANSI code
                             row, col = cursor_position_pattern.match(
                                 ansi_sequence
                             ).groups()
@@ -89,7 +89,7 @@ def receive_data(sock):
                             last_col = col
 
                         elif cursor_down_pattern.match(ansi_sequence):
-                            # Match the cursor down ANSI code, like \x1b[3B
+                            # Match the cursor down ANSI code
                             num_lines = int(
                                 cursor_down_pattern.match(ansi_sequence).group(1) or 1
                             )
@@ -175,11 +175,22 @@ def main():
         host = str(input("Target host (defaults to localhost): ") or "localhost")
         port = int(input("Target port (defaults to 23): ") or 23)
 
-    # Create TCP socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((host, port))
-
-    print(f"Connected to {host}:{port}")
+    try:
+        # Create TCP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+        print(f"Connected to {host}:{port}")
+    except ConnectionRefusedError:
+        print(
+            "Error: Connection refused. The server may not be listening on the specified port."
+        )
+        sys.exit(1)  # Exit the program with an error code
+    except socket.timeout:
+        print("Error: Connection timed out.")
+        sys.exit(1)
+    except socket.error as e:
+        print(f"Socket error: {e}")
+        sys.exit(1)
 
     sock.sendall(
         bytes([telc.IAC, telc.WONT, telc.OPTION_LINEMODE])
